@@ -1,0 +1,3 @@
+@echo off
+@echo Please wait, starting Beyond Compare...
+start "Beyond Compare" "C:\Program Files (x86)\Beyond Compare 3\BCompare.exe" %1 %2

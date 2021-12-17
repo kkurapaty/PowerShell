@@ -1,0 +1,3 @@
+@echo off
+@echo Please wait, starting Notepad ...
+start "Notepad" notepad.exe %1
