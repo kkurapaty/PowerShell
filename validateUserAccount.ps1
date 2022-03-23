@@ -1,4 +1,4 @@
-﻿CLS
+CLS
 ## MAKE SURE TO ADD BELOW TO YOUR SCRIPT ##
 . "$PSScriptRoot\fileIOUtil.ps1" -Force
 #END OF USAGE
@@ -81,6 +81,95 @@ function ValidateUserAccount([string]$user, [string]$password) {
     Write-Host
 }
 
+function Convert-ADSearchResult {
+    [cmdletbinding()] Param(
+    [Parameter(Position = 0,Mandatory,ValueFromPipeline)]
+    [ValidateNotNullorEmpty()] [System.DirectoryServices.SearchResult]$SearchResult
+    )
+    Begin {
+        Write-Verbose "Starting $($MyInvocation.MyCommand)"
+    }
+    Process {
+        Write-Verbose "Processing result for $($searchResult.Path)"
+        #create an ordered hashtable with property names alphabetized
+        $props = $SearchResult.Properties.PropertyNames | Sort-Object
+        $objHash = [ordered]@{}
+        foreach ($p in $props) {
+         $value =  $searchresult.Properties.item($p)
+         if ($value.count -eq 1) {
+            $value = $value[0]
+         }
+         $objHash.add($p,$value)
+        }
+        New-Object PSObject -property $objHash
+    }
+    End {
+        Write-Verbose "Ending $($MyInvocation.MyCommand)"
+    }
+}
+function SearchUserAccount([string] $userName) {
+    WriteLine "Please wait, Searching for $userName account..."
+    try {
+          $adSearcher = New-Object System.DirectoryServices.DirectorySearcher;
+          if ($adSearcher -eq $null)
+          {
+            #Write-Error $Error[0]
+            WriteLine "Could not instantiate ADSI Searcher." -MessageType 2
+            #Exit(1)
+          }
+          else
+          {
+            # $adSearcher.FindAll()    
+            if ([string]::IsNullOrWhiteSpace($userName)) { 
+                $adSearcher.filter = "(objectclass=user)"
+            } else {
+                $adSearcher.filter = "(&(objectclass=user)(samaccountname=$userName))"
+            }
+            #$adSearcher.filter = "(&(objectclass=user)(department=finance))"
+            
+            $props = "distinguishedname","name","samaccountname","title","department","directreports", 
+                     "whencreated","whenchanged","givenname","sn","userprincipalname","adspath","minPwdAge", "city", "country"
+            foreach ($item in $props) {
+                $adSearcher.PropertiesToLoad.Add($item) | out-null
+            }
+
+            <# $items = $adSearcher.FindAll() | Convert-ADSearchResult |
+                      Select @{Name = "Name";Expression = {Name}},
+                             @{Name = "GivenName";Expression = {GivenName}},
+                             @{Name = "samAccountName";Expression = {samAccountName}},                                                  
+                             @{Name = "Title";Expression = {$_.Title.value}},
+                             @{Name = "Department";Expression = {$_.Department.value}},
+                             @{Name = "Direct Reports";Expression = {$_.DirectReports.value}},
+                             @{Name = "UserPrincipal";Expression = {$_.UserPrincipalName.value}},
+                             @{Name = "AdsPath";Expression = {$_.AdsPath.value}},
+                             @{Name = "DN";Expression = {$_.DistinguishedName.value}},
+                             @{Name = "SN";Expression = {$_.SN.value}},
+                             @{Name = "City";Expression = {$_.City.value}},
+                             @{Name = "Country";Expression = {$_.Country.value}},
+                             @{Name = "Created";Expression = {$_.whencreated.value}},                             
+                             @{Name = "Modified";Expression = {$_.whenchanged.value}},
+                             @{Name = "PwdAge"; Expression = {(new-timespan -seconds ($_.ConvertLargeIntegerToInt64($_.minPwdAge.value) /10000000)).ToString() }}# | Out-GridView
+             #>
+            
+            $adSearcher.FindAll() | Convert-ADSearchResult | Select Name,GivenName,Title,SamAccountName,SN,UserPrincipalName,Department,City,Country,WhenCreated,WhenChanged | Out-GridView
+            
+            #WriteLine "Users by Department" -MessageType 1
+            #$adSearcher.FindAll() | Convert-ADSearchResult | Group Department -NoElement | Sort Count -Descending
+            #$adSearcher.FindAll() | Convert-ADSearchResult | Select Name,Department,Title
+            
+          }
+        }
+        catch [Exception] {
+            WriteLine "Could not fetch $userName account." -MessageType 2
+            Write-Error $Error[0]
+		    $err = $_.Exception
+		    while ( $err.InnerException ) {
+			    $err = $err.InnerException
+			    Write-Host "[ERROR] $err.Message" -ForegroundColor Red
+		    }
+	    }    
+    Write-Host
+}
 Clear
 
 $serviceAccounts = [ORDERED] @{
@@ -100,7 +189,14 @@ while ((Prompt-User -Message "Do you have account to validate ?" -Hint "Y/N" -Is
 }
 
 Write-Host ""
-if ((Prompt-User -Message "Do you wish to validate accounts ?" -Hint "Y/N" -IsRequired).ToString() -like "Y")
+while ((Prompt-User -Message "Would you like to search for an account ?" -Hint "Y/N" -IsRequired).ToString().ToUpper() -like "Y") 
+{ 
+    $userName = (Prompt-User -Message "User Name" -Hint "username" -IsOptional)    
+    SearchUserAccount $userName
+}
+
+Write-Host ""
+if ((Prompt-User -Message "Do you wish to validate service accounts ?" -Hint "Y/N" -IsRequired).ToString() -like "Y")
 {
     Write-Host "Validating Predefined User/Service Accounts, Please Wait..." -ForegroundColor Cyan
     foreach($account in $serviceAccounts.Keys) #  | Sort-Object -Property Key
