@@ -35,6 +35,7 @@ function Convert-ADSLargeInteger {
     $bytes = [System.BitConverter]::GetBytes($lowPart)
     $lowPart = [System.BitConverter]::ToUInt32($bytes, 0)
     Write-Output ($lowPart + $highPart)
+    return ($lowPart + $highPart);
 }
 
 function ValidateUserAccount([string]$user, [string]$password) {
@@ -127,31 +128,46 @@ function SearchUserAccount([string] $userName) {
             }
             #$adSearcher.filter = "(&(objectclass=user)(department=finance))"
             
-            $props = "distinguishedname","name","samaccountname","title","department","directreports", 
-                     "whencreated","whenchanged","givenname","sn","userprincipalname","adspath","minPwdAge", "city", "country"
+            # Ref: https://www.rlmueller.net/UserAttributes.htm
+            $props = "distinguishedname","name", "displayName", "samaccountname","title","department","directreports", 
+                     "whencreated","whenchanged","givenname","sn","userprincipalname","adspath", "l", "c", "physicalDeliveryOfficeName",
+                     "telephoneNumber", "mobile", "manager", "accountExpires", "employeeID", "userAccountControl",
+                     "lastLogon", "lastLogonTimestamp",  "userWorkstations", "minPwdAge",
+                     "meetingID", "meetingDescription", "meetingURL"
             foreach ($item in $props) {
                 $adSearcher.PropertiesToLoad.Add($item) | out-null
             }
 
-            <# $items = $adSearcher.FindAll() | Convert-ADSearchResult |
-                      Select @{Name = "Name";Expression = {Name}},
-                             @{Name = "GivenName";Expression = {GivenName}},
-                             @{Name = "samAccountName";Expression = {samAccountName}},                                                  
-                             @{Name = "Title";Expression = {$_.Title.value}},
-                             @{Name = "Department";Expression = {$_.Department.value}},
-                             @{Name = "Direct Reports";Expression = {$_.DirectReports.value}},
-                             @{Name = "UserPrincipal";Expression = {$_.UserPrincipalName.value}},
-                             @{Name = "AdsPath";Expression = {$_.AdsPath.value}},
-                             @{Name = "DN";Expression = {$_.DistinguishedName.value}},
-                             @{Name = "SN";Expression = {$_.SN.value}},
-                             @{Name = "City";Expression = {$_.City.value}},
-                             @{Name = "Country";Expression = {$_.Country.value}},
-                             @{Name = "Created";Expression = {$_.whencreated.value}},                             
-                             @{Name = "Modified";Expression = {$_.whenchanged.value}},
-                             @{Name = "PwdAge"; Expression = {(new-timespan -seconds ($_.ConvertLargeIntegerToInt64($_.minPwdAge.value) /10000000)).ToString() }}# | Out-GridView
-             #>
+             $adSearcher.FindAll() | Convert-ADSearchResult |
+                      Select @{Name = "Name";Expression = {$_.Name}}, `
+                             @{Name = "Display Name"; Expression = {$_.displayName}}, `
+                             @{Name = "Emp Id";Expression = {$_.EmployeeID}},`
+                             @{Name = "GivenName";Expression = {$_.GivenName}},`
+                             @{Name = "Surname";Expression = {$_.SN}},`
+                             @{Name = "samAccountName";Expression = {$_.samAccountName}},`
+                             @{Name = "Disabled";Expression = {$_.userAccountControl}},`
+                             @{Name = "Title";Expression = {$_.Title}},`
+                             @{Name = "Department";Expression = {$_.Department}},`
+                             @{Name = "Direct Reports";Expression = {$_.DirectReports}},`
+                             @{Name = "UserPrincipal";Expression = {$_.UserPrincipalName}},`
+                             @{Name = "Manager"; Expression = {$_.manager}}, `
+                             @{Name = "City";Expression = {$_.l}},`
+                             @{Name = "Country";Expression = {$_.c}},`
+                             @{Name = "Office"; Expression = {$_.physicalDeliveryOfficeName}}, `
+                             @{Name = "Phone"; Expression = {$_.telephoneNumber}}, `
+                             @{Name = "Mobile"; Expression = {$_.mobile}}, `
+                             @{Name = "Workstation"; Expression = {$_.userWorkstations}}, `
+                             @{Name = "Account Expires";Expression = {[datetime]::fromfiletime($_.AccountExpires) }},` 
+                             @{Name = "Created";Expression = {$_.whencreated}},`
+                             @{Name = "Modified";Expression = {$_.whenchanged}},` 
+                             @{Name = "Last Logon";Expression = {[datetime]::fromfiletime($_.lastLogonTimestamp) }},`                             
+                             @{Name = "Last Logoff";Expression = {[datetime]::fromfiletime($_.lastLogoff) }},`
+                             #@{Name = "AdsPath";Expression = {$_.AdsPath}},`
+                             #@{Name = "DN";Expression = {$_.DistinguishedName}},`                                                          
+                             @{Name = "PwdAge"; Expression = {(new-timespan -seconds ($_.ConvertLargeIntegerToInt64($_.minPwdAge) /10000000)).ToString() }} | Out-GridView
+             
             
-            $adSearcher.FindAll() | Convert-ADSearchResult | Select Name,GivenName,Title,SamAccountName,SN,UserPrincipalName,Department,City,Country,WhenCreated,WhenChanged | Out-GridView
+            #$adSearcher.FindAll() | Convert-ADSearchResult | Select Name,GivenName,Title,SamAccountName,SN,UserPrincipalName,Department,City,Country,WhenCreated,WhenChanged | Out-GridView
             
             #WriteLine "Users by Department" -MessageType 1
             #$adSearcher.FindAll() | Convert-ADSearchResult | Group Department -NoElement | Sort Count -Descending
@@ -208,4 +224,4 @@ if ((Prompt-User -Message "Do you wish to validate service accounts ?" -Hint "Y/
 
 Write-Host ""
 
-Print-ScriptCompleted "Authentication";
+Print-ScriptCompleted "Validatation";
