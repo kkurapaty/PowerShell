@@ -1,4 +1,4 @@
-﻿#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#
 <#
     .SYNOPSIS
         List out installed software on a computer (local / remote)
@@ -26,7 +26,8 @@ Function Get-SoftwareInstalled  {
   Param( 
         [Parameter(ValueFromPipeline=$True,ValueFromPipelineByPropertyName=$True)] 
         [String[]]$ComputerName=$env:COMPUTERNAME,
-        [bool] $FullDetails = $true
+        [bool] $FullDetails = $true,
+        [bool] $ShowGrid = $false
         )         
 
     Begin { }
@@ -187,14 +188,21 @@ Function Get-SoftwareInstalled  {
             
             if ($FullDetails)
             {
-                $local:Result | Sort-Object -Property DisplayName | Format-Table -AutoSize #-GroupBy 'Publisher' 
+                if ($ShowGrid) {
+                    $local:Result | Sort-Object -Property DisplayName | Out-GridView -Title "Installed Software"
+                } else {
+                    $local:Result | Sort-Object -Property DisplayName | Format-Table -AutoSize #-GroupBy 'Publisher' 
+                }
             }
             Else {
-                $local:Result | Sort-Object -Property DisplayName | Select -Property ComputerName, DisplayName, Version, Publisher | Format-Table -AutoSize # -GroupBy 'Publisher'
+                if ($ShowGrid) {
+                    $local:Result | Sort-Object -Property DisplayName | Select -Property ComputerName, DisplayName, Version, Publisher | Out-GridView -Title "Installed Software"
+                } else {
+                    $local:Result | Sort-Object -Property DisplayName | Select -Property ComputerName, DisplayName, Version, Publisher | Format-Table -AutoSize # -GroupBy 'Publisher'
+                }
             }           
         }         
-    }
-    
+    }    
 }
 
 function Print-ScriptTitle() 
@@ -214,5 +222,8 @@ function Print-ScriptTitle()
 }
 Clear;
     Print-ScriptTitle;
-    Get-SoftwareInstalled -FullDetails:$false;   
+    $showFullDetails = (Prompt-User -Message "Show Full details ?" -Hint "Y/N" -IsRequired).ToString().ToUpper() -like "Y";
+    $showInGrid = (Prompt-User -Message "Show in grid ?" -Hint "Y/N" -IsRequired).ToString().ToUpper() -like "Y";
+
+    Get-SoftwareInstalled -FullDetails:$showFullDetails -ShowGrid:$showInGrid;   
     Print-ScriptCompleted -Message "$global:count Softwares Installed"; 
